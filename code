@@ -1,0 +1,116 @@
+#Importing Packages:
+import pandas as pd
+from sklearn.model_selection import train_test_split
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.naive_bayes import MultinomialNB
+from sklearn.feature_extraction.text import CountVectorizer
+from sklearn.linear_model import LogisticRegression
+from sklearn.svm import SVC
+from sklearn.metrics import classification_report, accuracy_score
+
+#Load Data:
+data_path = '/content/spam.csv'
+df = pd.read_csv(data_path, encoding='latin-1')
+print(df.head())
+
+#Clean The Data:
+df = df[['v1', 'v2']]
+df.columns = ['label', 'message']
+df['label'] = df['label'].map({'ham': 0, 'spam': 1})
+
+#Split the data into training and testing sets:
+X_train, X_test, y_train, y_test = train_test_split(df['message'], df['label'], test_size=0.2, random_state=42)
+print("Training set size:", X_train.shape[0])
+print("Testing set size:", X_test.shape[0])
+
+#Convert the text data to numerical format using TF-IDF:
+tfidf_vectorizer = TfidfVectorizer(stop_words='english', max_df=0.95, min_df=2)
+X_train_tfidf = tfidf_vectorizer.fit_transform(X_train)
+X_test_tfidf = tfidf_vectorizer.transform(X_test)
+
+#Convert the text data to numerical format using CountVectorizer:
+count_vectorizer = CountVectorizer(stop_words='english', max_df=0.95, min_df=2)
+X_train_counts = count_vectorizer.fit_transform(X_train)
+X_test_counts = count_vectorizer.transform(X_test)
+
+#Exploratory Data Analysis:
+class_distribution = df['label'].value_counts()
+print(class_distribution)
+
+import matplotlib.pyplot as plt
+import seaborn as sns
+plt.figure(figsize=(6, 4))
+sns.countplot(x='label', data=df)
+plt.title('Class Distribution')
+plt.xlabel('Label (0: Ham, 1: Spam)')
+plt.ylabel('Count')
+plt.show()
+
+df['message_length'] = df['message'].apply(len)
+
+plt.figure(figsize=(12, 6))
+sns.histplot(df[df['label'] == 0]['message_length'], bins=50, label='Ham', color='blue', kde=True)
+sns.histplot(df[df['label'] == 1]['message_length'], bins=50, label='Spam', color='red', kde=True)
+plt.title('Message Length Distribution')
+plt.xlabel('Message Length')
+plt.ylabel('Frequency')
+plt.legend()
+plt.show()
+
+print(df.groupby('label')['message_length'].describe())
+
+#Visualizing the transformed data:
+from sklearn.manifold import TSNE
+tsne = TSNE(n_components=2, random_state=42)
+X_train_tsne = tsne.fit_transform(X_train_counts.toarray())
+tsne_df = pd.DataFrame(X_train_tsne, columns=['Component 1', 'Component 2'])
+tsne_df['label'] = y_train.values
+plt.figure(figsize=(10, 7))
+sns.scatterplot(x='Component 1', y='Component 2', hue='label', data=tsne_df, palette=['blue', 'red'], legend='full')
+plt.title('t-SNE Visualization of SMS Messages')
+plt.xlabel('Component 1')
+plt.ylabel('Component 2')
+plt.legend(title='Label', labels=['Ham', 'Spam'])
+plt.show()
+
+#Building our ML model:
+nb_classifier = MultinomialNB()
+nb_classifier.fit(X_train_counts, y_train)
+y_pred_nb = nb_classifier.predict(X_test_counts)
+print("Naive Bayes Classifier")
+print("Accuracy:", accuracy_score(y_test, y_pred_nb))
+print(classification_report(y_test, y_pred_nb))
+
+lr_classifier = LogisticRegression(max_iter=1000)
+lr_classifier.fit(X_train_counts, y_train)
+y_pred_lr = lr_classifier.predict(X_test_counts)
+print("Logistic Regression Classifier")
+print("Accuracy:", accuracy_score(y_test, y_pred_lr))
+print(classification_report(y_test, y_pred_lr))
+
+svm_classifier = SVC()
+svm_classifier.fit(X_train_counts, y_train)
+y_pred_svm = svm_classifier.predict(X_test_counts)
+print("SVM Classifier")
+print("Accuracy:", accuracy_score(y_test, y_pred_svm))
+print(classification_report(y_test, y_pred_svm))
+
+#Evaluating the best model on test set:
+metrics = {
+    'Naive Bayes': {
+        'Accuracy': accuracy_score(y_test, y_pred_nb),
+        'Classification Report': classification_report(y_test, y_pred_nb, output_dict=True)
+    },
+    'Logistic Regression': {
+        'Accuracy': accuracy_score(y_test, y_pred_lr),
+        'Classification Report': classification_report(y_test, y_pred_lr, output_dict=True)
+    },
+    'SVM': {
+        'Accuracy': accuracy_score(y_test, y_pred_svm),
+        'Classification Report': classification_report(y_test, y_pred_svm, output_dict=True)
+    }
+}
+for model, metric in metrics.items():
+    print(f"\n{model} Classifier")
+    print("Accuracy:", metric['Accuracy'])
+    print("Classification Report:\n", metric['Classification Report'])
